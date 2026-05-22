@@ -100,7 +100,7 @@ cp .env.example .env
 cp internal/config/local.yaml.example internal/config/local.yaml
 ```
 
-В `.env` задайте `POSTGRES_PASSWORD=...` — его же подхватит приложение (`DB_PASSWORD` или `POSTGRES_PASSWORD`).
+В `.env` задайте `POSTGRES_PASSWORD=...` — его же подхватит приложение.
 
 **Остальное** (хост, порт, пользователь, `srvHost`) — в yaml:
 
