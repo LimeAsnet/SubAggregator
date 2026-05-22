@@ -1,0 +1,11 @@
+.git
+.gitignore
+.idea
+.vscode
+bin/
+*.md
+!README.md
+**/*_test.go
+**/integration/
+**/.env
+.env.*

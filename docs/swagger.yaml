@@ -1,0 +1,251 @@
+basePath: /api/v1
+definitions:
+  models.CreateSubscriptionRequest:
+    properties:
+      end_date:
+        description: формат "12-2025", опционально
+        type: string
+      monthly_cost:
+        type: number
+      service_name:
+        maxLength: 255
+        minLength: 1
+        type: string
+      start_date:
+        description: формат "07-2025"
+        type: string
+      user_id:
+        type: string
+    required:
+    - monthly_cost
+    - service_name
+    - start_date
+    - user_id
+    type: object
+  models.CreateSubscriptionResponse:
+    properties:
+      id:
+        example: 1
+        type: integer
+    type: object
+  models.ErrorResponse:
+    properties:
+      error:
+        example: invalid request
+        type: string
+    type: object
+  models.PatchSubscriptionRequest:
+    properties:
+      end_date:
+        description: формат MM-YYYY
+        example: 12-2026
+        type: string
+    required:
+    - end_date
+    type: object
+  models.Subscription:
+    properties:
+      end_date:
+        description: NULL = активная подписка
+        type: string
+      id:
+        type: integer
+      monthly_cost:
+        type: number
+      service_name:
+        type: string
+      start_date:
+        description: 'в БД: DATE, в Go: time.Time'
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.SubscriptionTotalAmount:
+    properties:
+      total_amount:
+        type: number
+    type: object
+host: localhost:8082
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+  description: API агрегатора подписок.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: SubAggregator API
+  version: "1.0"
+paths:
+  /subscriptions:
+    get:
+      description: Возвращает все подписки пользователя, отсортированные по дате начала
+        (убывание).
+      parameters:
+      - description: UUID пользователя
+        format: uuid
+        in: query
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Subscription'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Список подписок пользователя
+      tags:
+      - subscriptions
+    post:
+      consumes:
+      - application/json
+      description: Создаёт новую подписку. Даты в формате MM-YYYY (например 07-2025).
+      parameters:
+      - description: Данные подписки
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.CreateSubscriptionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Создать подписку
+      tags:
+      - subscriptions
+  /subscriptions/{id}:
+    delete:
+      parameters:
+      - description: ID подписки
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Удалить подписку
+      tags:
+      - subscriptions
+    patch:
+      consumes:
+      - application/json
+      description: Обновляет только end_date подписки в формате MM-YYYY (например
+        12-2026).
+      parameters:
+      - description: ID подписки
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Новая дата окончания
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PatchSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Обновить дату окончания подписки
+      tags:
+      - subscriptions
+  /subscriptions/total:
+    get:
+      description: Считает суммарную стоимость подписок пользователя на сервис за
+        период. Даты периода в формате MM-YYYY.
+      parameters:
+      - description: UUID пользователя
+        format: uuid
+        in: query
+        name: user_id
+        required: true
+        type: string
+      - description: Название сервиса
+        example: Netflix
+        in: query
+        name: service_name
+        required: true
+        type: string
+      - description: Начало периода
+        example: 01-2025
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: Конец периода
+        example: 12-2025
+        in: query
+        name: end_date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SubscriptionTotalAmount'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Суммарная стоимость подписок
+      tags:
+      - subscriptions
+schemes:
+- http
+swagger: "2.0"

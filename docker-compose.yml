@@ -1,0 +1,73 @@
+x-app-environment: &app-environment
+  CONFIG_NAME: docker
+  DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: subaggregator-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Create .env from .env.example and set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-subHubdb}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-subHubdb}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - subaggregator
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: subaggregator-migrate
+    command: ["./migrate", "up"]
+    environment:
+      <<: *app-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - subaggregator
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: subaggregator-app
+    command: ["./app"]
+    ports:
+      - "${APP_PORT:-8082}:8082"
+    environment:
+      <<: *app-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8082/swagger/index.html"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - subaggregator
+
+networks:
+  subaggregator:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,0 +1,10 @@
+env: "local"
+httpServer:
+  srvHost: "localhost:8082"
+
+database:
+  dbName: "subHubdb"
+  dbHost: "localhost"
+  dbPort: "5432"
+  dbSSLmode: "disable"
+  dbUser: "postgres"
