@@ -1,8 +1,14 @@
 package main
 
 import (
+	"context"
+	"log"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/LimeAsnet/SubAggregator/internal/config"
 	"github.com/LimeAsnet/SubAggregator/internal/database"
@@ -33,6 +39,9 @@ import (
 
 // @schemes   http
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	cfg := config.InitConfig()
 	slogLog := logger.New(cfg.Env)
 
@@ -56,7 +65,30 @@ func main() {
 	api := router.Group("/api/v1")
 	subHandler.Register(api)
 
-	if err := router.Run(cfg.HttpServer.Host); err != nil {
-		slogLog.Error("server stopped", slog.String("error", err.Error()))
+	srv := &http.Server{
+		Addr:    cfg.HttpServer.Host,
+		Handler: router.Handler(),
 	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen %s\n", err)
+		}
+	}()
+
+	<-ctx.Done()
+
+	slogLog.Info("shutting down gracefully, press Ctrl+C again to force")
+
+	shutdownCtx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Duration(cfg.HttpServer.ShutdownTimeout)*time.Second,
+	)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slogLog.Error("server forced to shutdown", slog.String("error", err.Error()))
+	}
+
+	slogLog.Info("server exiting")
+
 }

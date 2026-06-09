@@ -1,6 +1,7 @@
 env: "local"
 httpServer:
   srvHost: "localhost:8082"
+  shutdownTimeoutSec: 8
 
 database:
   dbName: "subHubdb"

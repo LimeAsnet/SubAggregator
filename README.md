@@ -102,7 +102,9 @@ cp internal/config/local.yaml.example internal/config/local.yaml
 
 В `.env` задайте `POSTGRES_PASSWORD=...` — его же подхватит приложение.
 
-**Остальное** (хост, порт, пользователь, `srvHost`) — в yaml:
+**Остальное** (хост, порт, пользователь, `srvHost`, `shutdownTimeoutSec`) — в yaml:
+
+`shutdownTimeoutSec` — время ожидания завершения активных запросов при graceful shutdown (секунды, по умолчанию `8`).
 
 | Файл | Когда |
 |------|--------|
