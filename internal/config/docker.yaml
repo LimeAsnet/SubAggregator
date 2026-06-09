@@ -1,6 +1,7 @@
 env: "prod"
 httpServer:
   srvHost: "0.0.0.0:8082"
+  shutdownTimeoutSec: 8
 
 database:
   dbName: "subHubdb"

@@ -12,7 +12,8 @@ import (
 const configNameDefault = "local"
 
 type HttpServer struct {
-	Host string `mapstructure:"srvHost"`
+	Host            string `mapstructure:"srvHost"`
+	ShutdownTimeout int    `mapstructure:"shutdownTimeoutSec"`
 }
 
 type Database struct {
@@ -60,6 +61,7 @@ func LoadConfigFromDir(configDir, configName string) (Config, error) {
 	viperCfg.SetConfigName(configName)
 	viperCfg.SetConfigType("yaml")
 	viperCfg.AddConfigPath(configDir)
+	viperCfg.SetDefault("httpServer.shutdownTimeoutSec", 8)
 
 	if err := viperCfg.ReadInConfig(); err != nil {
 		return Config{}, fmt.Errorf("read config %q from %s: %w", configName, configDir, err)
