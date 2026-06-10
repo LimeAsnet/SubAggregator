@@ -112,25 +112,33 @@ func (r *SubscriptionRepository) ListByUserID(ctx context.Context, userID uuid.U
 	return subs, total, nil
 }
 
-func (r *SubscriptionRepository) Update(ctx context.Context, id int64, endDate *string) error {
-	return r.pool.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+func (r *SubscriptionRepository) Update(ctx context.Context, id int64, endDate *string) (models.Subscription, error) {
+	var sub models.Subscription
+	err := r.pool.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		query := `
         UPDATE subscriptions
         SET end_date = COALESCE($1::date, end_date)
         WHERE id = $2
+        RETURNING id, service_name, monthly_cost, user_id, start_date, end_date
     `
-		tag, err := tx.Exec(ctx, query, endDate, id)
+		err := tx.QueryRow(ctx, query, endDate, id).Scan(
+			&sub.ID, &sub.ServiceName, &sub.MonthlyCost, &sub.UserID, &sub.StartDate, &sub.EndDate,
+		)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return service.ErrNotFound
+			}
 			if isEndBeforeStartConstraint(err) {
 				return service.ErrEndBeforeStart
 			}
 			return fmt.Errorf("update subscription: %w", err)
 		}
-		if tag.RowsAffected() == 0 {
-			return service.ErrNotFound
-		}
 		return nil
 	})
+	if err != nil {
+		return models.Subscription{}, err
+	}
+	return sub, nil
 }
 
 func isEndBeforeStartConstraint(err error) bool {
@@ -140,9 +148,14 @@ func isEndBeforeStartConstraint(err error) bool {
 
 func (r *SubscriptionRepository) Delete(ctx context.Context, id int64) error {
 	return r.pool.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		query := `DELETE FROM subscriptions WHERE id = $1`
-		_, err := tx.Exec(ctx, query, id)
-		return err
+		tag, err := tx.Exec(ctx, `DELETE FROM subscriptions WHERE id = $1`, id)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return service.ErrNotFound
+		}
+		return nil
 	})
 }
 

@@ -116,12 +116,8 @@ func TestSubscriptionService_List_EmptySlice(t *testing.T) {
 	}
 	svc := NewSubscriptionService(repo)
 
-	result, err := svc.ListByUserID(context.Background(), testUserID, Pagination{Page: 1, PageSize: 20})
-	require.NoError(t, err)
-	assert.Equal(t, []models.Subscription{}, result.Items)
-	assert.Equal(t, int64(0), result.Total)
-	assert.Equal(t, 1, result.Page)
-	assert.Equal(t, 20, result.PageSize)
+	_, err := svc.ListByUserID(context.Background(), testUserID, Pagination{Page: 1, PageSize: 20})
+	assert.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestSubscriptionService_List_ReturnsData(t *testing.T) {
@@ -147,13 +143,13 @@ func TestSubscriptionService_List_ReturnsData(t *testing.T) {
 
 func TestSubscriptionService_Update_EmptyEndDate(t *testing.T) {
 	svc := NewSubscriptionService(&mocks.SubscriptionRepository{})
-	err := svc.Update(context.Background(), 1, models.PatchSubscriptionRequest{})
+	_, err := svc.Update(context.Background(), 1, models.PatchSubscriptionRequest{})
 	assert.ErrorIs(t, err, ErrEmptyPatch)
 }
 
 func TestSubscriptionService_Update_InvalidDate(t *testing.T) {
 	svc := NewSubscriptionService(&mocks.SubscriptionRepository{})
-	err := svc.Update(context.Background(), 1, models.PatchSubscriptionRequest{EndDate: "bad-date"})
+	_, err := svc.Update(context.Background(), 1, models.PatchSubscriptionRequest{EndDate: "bad-date"})
 	assert.ErrorIs(t, err, ErrInvalidDate)
 }
 
@@ -176,30 +172,32 @@ func TestSubscriptionService_Create_ActiveSubscription(t *testing.T) {
 
 func TestSubscriptionService_Update_NotFound(t *testing.T) {
 	repo := &mocks.SubscriptionRepository{
-		UpdateFn: func(context.Context, int64, *string) error {
-			return ErrNotFound
+		UpdateFn: func(context.Context, int64, *string) (models.Subscription, error) {
+			return models.Subscription{}, ErrNotFound
 		},
 	}
 	svc := NewSubscriptionService(repo)
 
-	err := svc.Update(context.Background(), 99, models.PatchSubscriptionRequest{EndDate: "12-2026"})
+	_, err := svc.Update(context.Background(), 99, models.PatchSubscriptionRequest{EndDate: "12-2026"})
 	assert.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestSubscriptionService_Update_Success(t *testing.T) {
 	var gotID int64
 	var gotEnd *string
+	expected := models.Subscription{ID: 7, ServiceName: "Netflix", UserID: testUserID}
 	repo := &mocks.SubscriptionRepository{
-		UpdateFn: func(_ context.Context, id int64, endDate *string) error {
+		UpdateFn: func(_ context.Context, id int64, endDate *string) (models.Subscription, error) {
 			gotID = id
 			gotEnd = endDate
-			return nil
+			return expected, nil
 		},
 	}
 	svc := NewSubscriptionService(repo)
 
-	err := svc.Update(context.Background(), 7, models.PatchSubscriptionRequest{EndDate: "12-2026"})
+	sub, err := svc.Update(context.Background(), 7, models.PatchSubscriptionRequest{EndDate: "12-2026"})
 	require.NoError(t, err)
+	assert.Equal(t, expected, sub)
 	assert.Equal(t, int64(7), gotID)
 	require.NotNil(t, gotEnd)
 	assert.Equal(t, "2026-12-01", *gotEnd)
@@ -244,6 +242,17 @@ func TestParseUserID(t *testing.T) {
 	id, err := ParseUserID(testUserID.String())
 	require.NoError(t, err)
 	assert.Equal(t, testUserID, id)
+}
+
+func TestSubscriptionService_Delete_NotFound(t *testing.T) {
+	repo := &mocks.SubscriptionRepository{
+		DeleteFn: func(context.Context, int64) error {
+			return ErrNotFound
+		},
+	}
+	svc := NewSubscriptionService(repo)
+	err := svc.Delete(context.Background(), 99)
+	assert.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestSubscriptionService_Delete_Error(t *testing.T) {

@@ -142,7 +142,11 @@ func TestSubscriptionAPI_Integration(t *testing.T) {
 		bytes.NewBufferString(`{"end_date":"12-2026"}`))
 	patchReq.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(patchW, patchReq)
-	require.Equal(t, http.StatusNoContent, patchW.Code, "patch: %s", patchW.Body.String())
+	require.Equal(t, http.StatusOK, patchW.Code, "patch: %s", patchW.Body.String())
+
+	var patched models.Subscription
+	require.NoError(t, json.Unmarshal(patchW.Body.Bytes(), &patched))
+	assert.NotNil(t, patched.EndDate)
 
 	listW := httptest.NewRecorder()
 	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/subscriptions?user_id="+userID.String(), nil)
@@ -154,6 +158,17 @@ func TestSubscriptionAPI_Integration(t *testing.T) {
 	require.NotEmpty(t, listResult.Items)
 	assert.Equal(t, serviceName, listResult.Items[0].ServiceName)
 	assert.Equal(t, int64(1), listResult.Total)
+}
+
+func TestList_NotFound(t *testing.T) {
+	router := setupRouter(t)
+	userID := uuid.Must(uuid.NewV4())
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/subscriptions?user_id="+userID.String(), nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
 }
 
 func TestList_Pagination(t *testing.T) {
@@ -276,4 +291,14 @@ func TestIntegration_SecondCreateSameService_Conflict(t *testing.T) {
 
 	w2 := post()
 	assert.Equal(t, http.StatusConflict, w2.Code, "second active subscription: %s", w2.Body.String())
+}
+
+func TestDelete_NotFound(t *testing.T) {
+	router := setupRouter(t)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/subscriptions/999999999", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
 }

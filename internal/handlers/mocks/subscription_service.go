@@ -11,7 +11,7 @@ import (
 type SubscriptionService struct {
 	CreateFn    func(ctx context.Context, req models.CreateSubscriptionRequest) (int64, error)
 	ListFn      func(ctx context.Context, userID uuid.UUID, p service.Pagination) (models.ListSubscriptionsResponse, error)
-	UpdateFn    func(ctx context.Context, id int64, req models.PatchSubscriptionRequest) error
+	UpdateFn    func(ctx context.Context, id int64, req models.PatchSubscriptionRequest) (models.Subscription, error)
 	DeleteFn    func(ctx context.Context, id int64) error
 	TotalCostFn func(ctx context.Context, userID uuid.UUID, serviceName, startDate, endDate string) (models.GetSubscriptionTotalAmountResponse, error)
 }
@@ -30,11 +30,11 @@ func (m *SubscriptionService) ListByUserID(ctx context.Context, userID uuid.UUID
 	return models.ListSubscriptionsResponse{}, nil
 }
 
-func (m *SubscriptionService) Update(ctx context.Context, id int64, req models.PatchSubscriptionRequest) error {
+func (m *SubscriptionService) Update(ctx context.Context, id int64, req models.PatchSubscriptionRequest) (models.Subscription, error) {
 	if m.UpdateFn != nil {
 		return m.UpdateFn(ctx, id, req)
 	}
-	return nil
+	return models.Subscription{}, nil
 }
 
 func (m *SubscriptionService) Delete(ctx context.Context, id int64) error {

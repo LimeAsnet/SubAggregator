@@ -14,7 +14,7 @@ import (
 type SubscriptionRepository interface {
 	Create(ctx context.Context, sub *models.Subscription) (int64, error)
 	ListByUserID(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]models.Subscription, int64, error)
-	Update(ctx context.Context, id int64, endDate *string) error
+	Update(ctx context.Context, id int64, endDate *string) (models.Subscription, error)
 	Delete(ctx context.Context, id int64) error
 	TotalCost(ctx context.Context, req *models.GetSubscriptionTotalAmountRequest) (models.GetSubscriptionTotalAmountResponse, error)
 }
@@ -65,6 +65,9 @@ func (s *SubscriptionService) ListByUserID(ctx context.Context, userID uuid.UUID
 	if err != nil {
 		return models.ListSubscriptionsResponse{}, fmt.Errorf("list subscriptions: %w", err)
 	}
+	if total == 0 {
+		return models.ListSubscriptionsResponse{}, ErrNotFound
+	}
 	if subs == nil {
 		subs = []models.Subscription{}
 	}
@@ -76,29 +79,33 @@ func (s *SubscriptionService) ListByUserID(ctx context.Context, userID uuid.UUID
 	}, nil
 }
 
-func (s *SubscriptionService) Update(ctx context.Context, id int64, req models.PatchSubscriptionRequest) error {
+func (s *SubscriptionService) Update(ctx context.Context, id int64, req models.PatchSubscriptionRequest) (models.Subscription, error) {
 	if req.EndDate == "" {
-		return ErrEmptyPatch
+		return models.Subscription{}, ErrEmptyPatch
 	}
 
 	parsed, err := ParseMonthYear(req.EndDate)
 	if err != nil {
-		return err
+		return models.Subscription{}, err
 	}
 	formatted := FormatMonthYearDate(parsed)
 	endDate := &formatted
 
-	if err := s.repo.Update(ctx, id, endDate); err != nil {
+	sub, err := s.repo.Update(ctx, id, endDate)
+	if err != nil {
 		if errors.Is(err, ErrNotFound) || errors.Is(err, ErrEndBeforeStart) {
-			return err
+			return models.Subscription{}, err
 		}
-		return fmt.Errorf("update subscription: %w", err)
+		return models.Subscription{}, fmt.Errorf("update subscription: %w", err)
 	}
-	return nil
+	return sub, nil
 }
 
 func (s *SubscriptionService) Delete(ctx context.Context, id int64) error {
 	if err := s.repo.Delete(ctx, id); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return err
+		}
 		return fmt.Errorf("delete subscription: %w", err)
 	}
 	return nil
