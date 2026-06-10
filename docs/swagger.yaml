@@ -3,16 +3,14 @@ definitions:
   models.CreateSubscriptionRequest:
     properties:
       end_date:
-        description: формат "12-2025", опционально
         type: string
       monthly_cost:
-        type: number
+        type: integer
       service_name:
         maxLength: 255
         minLength: 1
         type: string
       start_date:
-        description: формат "07-2025"
         type: string
       user_id:
         type: string
@@ -34,10 +32,27 @@ definitions:
         example: invalid request
         type: string
     type: object
+  models.GetSubscriptionTotalAmountResponse:
+    properties:
+      total_amount:
+        type: number
+    type: object
+  models.ListSubscriptionsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.Subscription'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
   models.PatchSubscriptionRequest:
     properties:
       end_date:
-        description: формат MM-YYYY
         example: 12-2026
         type: string
     required:
@@ -46,24 +61,17 @@ definitions:
   models.Subscription:
     properties:
       end_date:
-        description: NULL = активная подписка
         type: string
       id:
         type: integer
       monthly_cost:
-        type: number
+        type: integer
       service_name:
         type: string
       start_date:
-        description: 'в БД: DATE, в Go: time.Time'
         type: string
       user_id:
         type: string
-    type: object
-  models.SubscriptionTotalAmount:
-    properties:
-      total_amount:
-        type: number
     type: object
 host: localhost:8082
 info:
@@ -80,8 +88,8 @@ info:
 paths:
   /subscriptions:
     get:
-      description: Возвращает все подписки пользователя, отсортированные по дате начала
-        (убывание).
+      description: Возвращает подписки пользователя с пагинацией, отсортированные
+        по дате начала (убывание).
       parameters:
       - description: UUID пользователя
         format: uuid
@@ -89,15 +97,23 @@ paths:
         name: user_id
         required: true
         type: string
+      - default: 1
+        description: Номер страницы
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Размер страницы
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/models.Subscription'
-            type: array
+            $ref: '#/definitions/models.ListSubscriptionsResponse'
         "400":
           description: Bad Request
           schema:
@@ -129,6 +145,10 @@ paths:
             $ref: '#/definitions/models.CreateSubscriptionResponse'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/models.ErrorResponse'
         "500":
@@ -188,6 +208,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -230,7 +254,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.SubscriptionTotalAmount'
+            $ref: '#/definitions/models.GetSubscriptionTotalAmountResponse'
         "400":
           description: Bad Request
           schema:

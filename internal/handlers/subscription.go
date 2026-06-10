@@ -14,7 +14,7 @@ import (
 
 type subscriptionService interface {
 	Create(ctx context.Context, req models.CreateSubscriptionRequest) (int64, error)
-	ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Subscription, error)
+	ListByUserID(ctx context.Context, userID uuid.UUID, p service.Pagination) (models.ListSubscriptionsResponse, error)
 	Update(ctx context.Context, id int64, req models.PatchSubscriptionRequest) error
 	Delete(ctx context.Context, id int64) error
 	TotalCost(ctx context.Context, userID uuid.UUID, serviceName, startDate, endDate string) (models.GetSubscriptionTotalAmountResponse, error)
@@ -68,13 +68,15 @@ func (h *SubscriptionHandler) Create(c *gin.Context) {
 }
 
 // @Summary      Список подписок пользователя
-// @Description  Возвращает все подписки пользователя, отсортированные по дате начала (убывание).
+// @Description  Возвращает подписки пользователя с пагинацией, отсортированные по дате начала (убывание).
 // @Tags         subscriptions
 // @Produce      json
-// @Param        user_id  query     string  true  "UUID пользователя"  format(uuid)
-// @Success      200      {array}   models.Subscription
-// @Failure      400      {object}  models.ErrorResponse
-// @Failure      500      {object}  models.ErrorResponse
+// @Param        user_id    query     string  true   "UUID пользователя"  format(uuid)
+// @Param        page       query     int     false  "Номер страницы"     default(1)
+// @Param        page_size  query     int     false  "Размер страницы"    default(20)
+// @Success      200        {object}  models.ListSubscriptionsResponse
+// @Failure      400        {object}  models.ErrorResponse
+// @Failure      500        {object}  models.ErrorResponse
 // @Router       /subscriptions [get]
 func (h *SubscriptionHandler) List(c *gin.Context) {
 	userID, err := service.ParseUserID(c.Query("user_id"))
@@ -83,13 +85,19 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 		return
 	}
 
-	subs, err := h.svc.ListByUserID(c.Request.Context(), userID)
+	pagination, err := service.ParsePagination(c.Query("page"), c.Query("page_size"))
+	if err != nil {
+		writeServiceError(c, h.log, err, "invalid pagination parameters")
+		return
+	}
+
+	result, err := h.svc.ListByUserID(c.Request.Context(), userID, pagination)
 	if err != nil {
 		writeServiceError(c, h.log, err, "failed to list subscriptions")
 		return
 	}
 
-	c.JSON(http.StatusOK, subs)
+	c.JSON(http.StatusOK, result)
 }
 
 // @Summary      Обновить дату окончания подписки

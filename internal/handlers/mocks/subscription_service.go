@@ -4,12 +4,13 @@ import (
 	"context"
 
 	"github.com/LimeAsnet/SubAggregator/internal/models"
+	"github.com/LimeAsnet/SubAggregator/internal/service"
 	"github.com/gofrs/uuid"
 )
 
 type SubscriptionService struct {
 	CreateFn    func(ctx context.Context, req models.CreateSubscriptionRequest) (int64, error)
-	ListFn      func(ctx context.Context, userID uuid.UUID) ([]models.Subscription, error)
+	ListFn      func(ctx context.Context, userID uuid.UUID, p service.Pagination) (models.ListSubscriptionsResponse, error)
 	UpdateFn    func(ctx context.Context, id int64, req models.PatchSubscriptionRequest) error
 	DeleteFn    func(ctx context.Context, id int64) error
 	TotalCostFn func(ctx context.Context, userID uuid.UUID, serviceName, startDate, endDate string) (models.GetSubscriptionTotalAmountResponse, error)
@@ -22,11 +23,11 @@ func (m *SubscriptionService) Create(ctx context.Context, req models.CreateSubsc
 	return 0, nil
 }
 
-func (m *SubscriptionService) ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Subscription, error) {
+func (m *SubscriptionService) ListByUserID(ctx context.Context, userID uuid.UUID, p service.Pagination) (models.ListSubscriptionsResponse, error) {
 	if m.ListFn != nil {
-		return m.ListFn(ctx, userID)
+		return m.ListFn(ctx, userID, p)
 	}
-	return nil, nil
+	return models.ListSubscriptionsResponse{}, nil
 }
 
 func (m *SubscriptionService) Update(ctx context.Context, id int64, req models.PatchSubscriptionRequest) error {

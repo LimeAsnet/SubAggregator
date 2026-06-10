@@ -77,16 +77,24 @@ func (subRep *SubscriptionRepository) Create(ctx context.Context, sub *models.Su
 	return activeSubId, nil
 }
 
-func (r *SubscriptionRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Subscription, error) {
+func (r *SubscriptionRepository) ListByUserID(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]models.Subscription, int64, error) {
+	var total int64
+	countQuery := `SELECT COUNT(*) FROM subscriptions WHERE user_id = $1`
+	if err := r.pool.QueryRow(ctx, countQuery, userID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count subscriptions: %w", err)
+	}
+
+	offset := (page - 1) * pageSize
 	query := `
         SELECT id, service_name, monthly_cost, user_id, start_date, end_date
         FROM subscriptions
         WHERE user_id = $1
         ORDER BY start_date DESC
+        LIMIT $2 OFFSET $3
     `
-	rows, err := r.pool.Query(ctx, query, userID)
+	rows, err := r.pool.Query(ctx, query, userID, pageSize, offset)
 	if err != nil {
-		return nil, fmt.Errorf("select subscriptions: %w", err)
+		return nil, 0, fmt.Errorf("select subscriptions: %w", err)
 	}
 	defer rows.Close()
 
@@ -94,14 +102,14 @@ func (r *SubscriptionRepository) ListByUserID(ctx context.Context, userID uuid.U
 	for rows.Next() {
 		var s models.Subscription
 		if err := rows.Scan(&s.ID, &s.ServiceName, &s.MonthlyCost, &s.UserID, &s.StartDate, &s.EndDate); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		subs = append(subs, s)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("select subscriptions: %w", err)
+		return nil, 0, fmt.Errorf("select subscriptions: %w", err)
 	}
-	return subs, nil
+	return subs, total, nil
 }
 
 func (r *SubscriptionRepository) Update(ctx context.Context, id int64, endDate *string) error {

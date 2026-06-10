@@ -149,10 +149,58 @@ func TestSubscriptionAPI_Integration(t *testing.T) {
 	router.ServeHTTP(listW, listReq)
 	require.Equal(t, http.StatusOK, listW.Code, "list: %s", listW.Body.String())
 
-	var subs []models.Subscription
-	require.NoError(t, json.Unmarshal(listW.Body.Bytes(), &subs))
-	require.NotEmpty(t, subs)
-	assert.Equal(t, serviceName, subs[0].ServiceName)
+	var listResult models.ListSubscriptionsResponse
+	require.NoError(t, json.Unmarshal(listW.Body.Bytes(), &listResult))
+	require.NotEmpty(t, listResult.Items)
+	assert.Equal(t, serviceName, listResult.Items[0].ServiceName)
+	assert.Equal(t, int64(1), listResult.Total)
+}
+
+func TestList_Pagination(t *testing.T) {
+	router := setupRouter(t)
+	userID := uuid.Must(uuid.NewV4())
+
+	var createdIDs []int64
+	for i, month := range []string{"01-2025", "02-2025", "03-2025"} {
+		serviceName := uniqueServiceName(fmt.Sprintf("PageTest%d", i))
+		createBody := fmt.Sprintf(`{
+			"service_name": %q,
+			"monthly_cost": 100,
+			"user_id": %q,
+			"start_date": %q
+		}`, serviceName, userID.String(), month)
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewBufferString(createBody))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusCreated, w.Code, "create %d: %s", i, w.Body.String())
+
+		var created models.CreateSubscriptionResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &created))
+		createdIDs = append(createdIDs, created.ID)
+	}
+
+	t.Cleanup(func() {
+		for _, id := range createdIDs {
+			delW := httptest.NewRecorder()
+			delReq := httptest.NewRequest(http.MethodDelete, "/api/v1/subscriptions/"+strconv.FormatInt(id, 10), nil)
+			router.ServeHTTP(delW, delReq)
+		}
+	})
+
+	listW := httptest.NewRecorder()
+	listReq := httptest.NewRequest(http.MethodGet,
+		"/api/v1/subscriptions?user_id="+userID.String()+"&page=1&page_size=2", nil)
+	router.ServeHTTP(listW, listReq)
+	require.Equal(t, http.StatusOK, listW.Code, "list: %s", listW.Body.String())
+
+	var result models.ListSubscriptionsResponse
+	require.NoError(t, json.Unmarshal(listW.Body.Bytes(), &result))
+	assert.Equal(t, int64(3), result.Total)
+	assert.Equal(t, 1, result.Page)
+	assert.Equal(t, 2, result.PageSize)
+	assert.Len(t, result.Items, 2)
 }
 
 func TestTotalCost_ReturnsCorrectAmount(t *testing.T) {

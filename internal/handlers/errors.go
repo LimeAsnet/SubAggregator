@@ -17,6 +17,8 @@ func mapServiceError(err error) (status int, message string, ok bool) {
 		return http.StatusBadRequest, "end_date is required", true
 	case errors.Is(err, service.ErrInvalidUserID):
 		return http.StatusBadRequest, "user_id is required and must be a valid UUID", true
+	case errors.Is(err, service.ErrInvalidPagination):
+		return http.StatusBadRequest, err.Error(), true
 	case errors.Is(err, service.ErrActiveSubscription):
 		return http.StatusConflict, err.Error(), true
 	case errors.Is(err, service.ErrEndBeforeStart):

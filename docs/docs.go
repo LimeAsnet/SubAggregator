@@ -25,7 +25,7 @@ const docTemplate = `{
     "paths": {
         "/subscriptions": {
             "get": {
-                "description": "Возвращает все подписки пользователя, отсортированные по дате начала (убывание).",
+                "description": "Возвращает подписки пользователя с пагинацией, отсортированные по дате начала (убывание).",
                 "produces": [
                     "application/json"
                 ],
@@ -41,16 +41,27 @@ const docTemplate = `{
                         "name": "user_id",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Номер страницы",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Размер страницы",
+                        "name": "page_size",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.Subscription"
-                            }
+                            "$ref": "#/definitions/models.ListSubscriptionsResponse"
                         }
                     },
                     "400": {
@@ -99,6 +110,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -160,7 +177,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.SubscriptionTotalAmount"
+                            "$ref": "#/definitions/models.GetSubscriptionTotalAmountResponse"
                         }
                     },
                     "400": {
@@ -260,6 +277,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -281,11 +304,10 @@ const docTemplate = `{
             ],
             "properties": {
                 "end_date": {
-                    "description": "формат \"12-2025\", опционально",
                     "type": "string"
                 },
                 "monthly_cost": {
-                    "type": "number"
+                    "type": "integer"
                 },
                 "service_name": {
                     "type": "string",
@@ -293,7 +315,6 @@ const docTemplate = `{
                     "minLength": 1
                 },
                 "start_date": {
-                    "description": "формат \"07-2025\"",
                     "type": "string"
                 },
                 "user_id": {
@@ -319,6 +340,34 @@ const docTemplate = `{
                 }
             }
         },
+        "models.GetSubscriptionTotalAmountResponse": {
+            "type": "object",
+            "properties": {
+                "total_amount": {
+                    "type": "number"
+                }
+            }
+        },
+        "models.ListSubscriptionsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Subscription"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "models.PatchSubscriptionRequest": {
             "type": "object",
             "required": [
@@ -326,7 +375,6 @@ const docTemplate = `{
             ],
             "properties": {
                 "end_date": {
-                    "description": "формат MM-YYYY",
                     "type": "string",
                     "example": "12-2026"
                 }
@@ -336,32 +384,22 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "end_date": {
-                    "description": "NULL = активная подписка",
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
                 },
                 "monthly_cost": {
-                    "type": "number"
+                    "type": "integer"
                 },
                 "service_name": {
                     "type": "string"
                 },
                 "start_date": {
-                    "description": "в БД: DATE, в Go: time.Time",
                     "type": "string"
                 },
                 "user_id": {
                     "type": "string"
-                }
-            }
-        },
-        "models.SubscriptionTotalAmount": {
-            "type": "object",
-            "properties": {
-                "total_amount": {
-                    "type": "number"
                 }
             }
         }

@@ -9,7 +9,7 @@ import (
 
 type SubscriptionRepository struct {
 	CreateFn    func(ctx context.Context, sub *models.Subscription) (int64, error)
-	ListFn      func(ctx context.Context, userID uuid.UUID) ([]models.Subscription, error)
+	ListFn      func(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]models.Subscription, int64, error)
 	UpdateFn    func(ctx context.Context, id int64, endDate *string) error
 	DeleteFn    func(ctx context.Context, id int64) error
 	TotalCostFn func(ctx context.Context, req *models.GetSubscriptionTotalAmountRequest) (models.GetSubscriptionTotalAmountResponse, error)
@@ -22,11 +22,11 @@ func (m *SubscriptionRepository) Create(ctx context.Context, sub *models.Subscri
 	return 0, nil
 }
 
-func (m *SubscriptionRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Subscription, error) {
+func (m *SubscriptionRepository) ListByUserID(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]models.Subscription, int64, error) {
 	if m.ListFn != nil {
-		return m.ListFn(ctx, userID)
+		return m.ListFn(ctx, userID, page, pageSize)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 func (m *SubscriptionRepository) Update(ctx context.Context, id int64, endDate *string) error {

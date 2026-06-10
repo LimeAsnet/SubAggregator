@@ -168,7 +168,7 @@ Swagger: **http://localhost:8082/swagger/index.html**
 | Метод | Путь | Описание |
 |-------|------|----------|
 | `POST` | `/subscriptions` | Создать подписку |
-| `GET` | `/subscriptions?user_id={uuid}` | Список подписок пользователя |
+| `GET` | `/subscriptions?user_id={uuid}&page=1&page_size=20` | Список подписок пользователя (с пагинацией) |
 | `GET` | `/subscriptions/total` | Суммарная стоимость за период |
 | `PATCH` | `/subscriptions/{id}` | Обновить дату окончания (`end_date`) |
 | `DELETE` | `/subscriptions/{id}` | Удалить подписку |
@@ -196,8 +196,21 @@ curl -X POST http://localhost:8082/api/v1/subscriptions \
 **Список подписок**
 
 ```bash
-curl "http://localhost:8082/api/v1/subscriptions?user_id=550e8400-e29b-41d4-a716-446655440000"
+curl "http://localhost:8082/api/v1/subscriptions?user_id=550e8400-e29b-41d4-a716-446655440000&page=1&page_size=20"
 ```
+
+Ответ:
+
+```json
+{
+  "items": [ /* подписки */ ],
+  "page": 1,
+  "page_size": 20,
+  "total": 42
+}
+```
+
+Параметры `page` (по умолчанию `1`) и `page_size` (по умолчанию `20`, максимум `100`) опциональны.
 
 **Суммарная стоимость**
 
