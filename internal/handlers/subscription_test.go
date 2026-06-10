@@ -190,8 +190,15 @@ func TestHandler_Delete_InvalidID(t *testing.T) {
 
 func TestHandler_List_Success(t *testing.T) {
 	svc := &mocks.SubscriptionService{
-		ListFn: func(_ context.Context, id uuid.UUID) ([]models.Subscription, error) {
-			return []models.Subscription{{ID: 1, ServiceName: "Netflix", UserID: id}}, nil
+		ListFn: func(_ context.Context, id uuid.UUID, p service.Pagination) (models.ListSubscriptionsResponse, error) {
+			assert.Equal(t, 1, p.Page)
+			assert.Equal(t, 20, p.PageSize)
+			return models.ListSubscriptionsResponse{
+				Items:    []models.Subscription{{ID: 1, ServiceName: "Netflix", UserID: id}},
+				Page:     1,
+				PageSize: 20,
+				Total:    1,
+			}, nil
 		},
 	}
 
@@ -200,9 +207,26 @@ func TestHandler_List_Success(t *testing.T) {
 	setupRouter(newTestHandler(svc)).ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Code)
-	var subs []models.Subscription
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &subs))
-	require.Len(t, subs, 1)
+	var result models.ListSubscriptionsResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, int64(1), result.Total)
+	assert.Equal(t, 1, result.Page)
+	assert.Equal(t, 20, result.PageSize)
+}
+
+func TestHandler_List_InvalidPage(t *testing.T) {
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/subscriptions?user_id="+testUserID.String()+"&page=0", nil)
+	setupRouter(newTestHandler(&mocks.SubscriptionService{})).ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandler_List_InvalidPageSize(t *testing.T) {
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/subscriptions?user_id="+testUserID.String()+"&page_size=101", nil)
+	setupRouter(newTestHandler(&mocks.SubscriptionService{})).ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestHandler_Create_ActiveSubscription(t *testing.T) {

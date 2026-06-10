@@ -13,7 +13,7 @@ import (
 
 type SubscriptionRepository interface {
 	Create(ctx context.Context, sub *models.Subscription) (int64, error)
-	ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Subscription, error)
+	ListByUserID(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]models.Subscription, int64, error)
 	Update(ctx context.Context, id int64, endDate *string) error
 	Delete(ctx context.Context, id int64) error
 	TotalCost(ctx context.Context, req *models.GetSubscriptionTotalAmountRequest) (models.GetSubscriptionTotalAmountResponse, error)
@@ -60,15 +60,20 @@ func (s *SubscriptionService) Create(ctx context.Context, req models.CreateSubsc
 	return id, nil
 }
 
-func (s *SubscriptionService) ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Subscription, error) {
-	subs, err := s.repo.ListByUserID(ctx, userID)
+func (s *SubscriptionService) ListByUserID(ctx context.Context, userID uuid.UUID, p Pagination) (models.ListSubscriptionsResponse, error) {
+	subs, total, err := s.repo.ListByUserID(ctx, userID, p.Page, p.PageSize)
 	if err != nil {
-		return nil, fmt.Errorf("list subscriptions: %w", err)
+		return models.ListSubscriptionsResponse{}, fmt.Errorf("list subscriptions: %w", err)
 	}
 	if subs == nil {
-		return []models.Subscription{}, nil
+		subs = []models.Subscription{}
 	}
-	return subs, nil
+	return models.ListSubscriptionsResponse{
+		Items:    subs,
+		Page:     p.Page,
+		PageSize: p.PageSize,
+		Total:    total,
+	}, nil
 }
 
 func (s *SubscriptionService) Update(ctx context.Context, id int64, req models.PatchSubscriptionRequest) error {

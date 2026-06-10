@@ -47,6 +47,14 @@ type GetSubscriptionTotalAmountResponse struct {
 	TotalAmount float64 `json:"total_amount"`
 }
 
+// ListSubscriptionsResponse — ответ GET /subscriptions
+type ListSubscriptionsResponse struct {
+	Items    []Subscription `json:"items"`
+	Page     int            `json:"page"`
+	PageSize int            `json:"page_size"`
+	Total    int64          `json:"total"`
+}
+
 // ErrorResponse — тело ответа с ошибкой
 type ErrorResponse struct {
 	Error string `json:"error" example:"invalid request"`

@@ -75,17 +75,53 @@ func TestSubscriptionService_Create_WithoutEndDate(t *testing.T) {
 	assert.Nil(t, captured.EndDate)
 }
 
+func TestParsePagination_Defaults(t *testing.T) {
+	p, err := ParsePagination("", "")
+	require.NoError(t, err)
+	assert.Equal(t, DefaultPage, p.Page)
+	assert.Equal(t, DefaultPageSize, p.PageSize)
+}
+
+func TestParsePagination_Custom(t *testing.T) {
+	p, err := ParsePagination("2", "10")
+	require.NoError(t, err)
+	assert.Equal(t, 2, p.Page)
+	assert.Equal(t, 10, p.PageSize)
+}
+
+func TestParsePagination_InvalidPage(t *testing.T) {
+	_, err := ParsePagination("0", "")
+	assert.ErrorIs(t, err, ErrInvalidPagination)
+
+	_, err = ParsePagination("abc", "")
+	assert.ErrorIs(t, err, ErrInvalidPagination)
+}
+
+func TestParsePagination_InvalidPageSize(t *testing.T) {
+	_, err := ParsePagination("", "0")
+	assert.ErrorIs(t, err, ErrInvalidPagination)
+
+	_, err = ParsePagination("", "101")
+	assert.ErrorIs(t, err, ErrInvalidPagination)
+
+	_, err = ParsePagination("", "abc")
+	assert.ErrorIs(t, err, ErrInvalidPagination)
+}
+
 func TestSubscriptionService_List_EmptySlice(t *testing.T) {
 	repo := &mocks.SubscriptionRepository{
-		ListFn: func(context.Context, uuid.UUID) ([]models.Subscription, error) {
-			return nil, nil
+		ListFn: func(context.Context, uuid.UUID, int, int) ([]models.Subscription, int64, error) {
+			return nil, 0, nil
 		},
 	}
 	svc := NewSubscriptionService(repo)
 
-	subs, err := svc.ListByUserID(context.Background(), testUserID)
+	result, err := svc.ListByUserID(context.Background(), testUserID, Pagination{Page: 1, PageSize: 20})
 	require.NoError(t, err)
-	assert.Equal(t, []models.Subscription{}, subs)
+	assert.Equal(t, []models.Subscription{}, result.Items)
+	assert.Equal(t, int64(0), result.Total)
+	assert.Equal(t, 1, result.Page)
+	assert.Equal(t, 20, result.PageSize)
 }
 
 func TestSubscriptionService_List_ReturnsData(t *testing.T) {
@@ -94,16 +130,19 @@ func TestSubscriptionService_List_ReturnsData(t *testing.T) {
 		{ID: 2, ServiceName: "Spotify", UserID: testUserID},
 	}
 	repo := &mocks.SubscriptionRepository{
-		ListFn: func(_ context.Context, userID uuid.UUID) ([]models.Subscription, error) {
+		ListFn: func(_ context.Context, userID uuid.UUID, page, pageSize int) ([]models.Subscription, int64, error) {
 			assert.Equal(t, testUserID, userID)
-			return expected, nil
+			assert.Equal(t, 1, page)
+			assert.Equal(t, 20, pageSize)
+			return expected, 2, nil
 		},
 	}
 	svc := NewSubscriptionService(repo)
 
-	subs, err := svc.ListByUserID(context.Background(), testUserID)
+	result, err := svc.ListByUserID(context.Background(), testUserID, Pagination{Page: 1, PageSize: 20})
 	require.NoError(t, err)
-	assert.Equal(t, expected, subs)
+	assert.Equal(t, expected, result.Items)
+	assert.Equal(t, int64(2), result.Total)
 }
 
 func TestSubscriptionService_Update_EmptyEndDate(t *testing.T) {
