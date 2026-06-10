@@ -15,7 +15,7 @@ import (
 type subscriptionService interface {
 	Create(ctx context.Context, req models.CreateSubscriptionRequest) (int64, error)
 	ListByUserID(ctx context.Context, userID uuid.UUID, p service.Pagination) (models.ListSubscriptionsResponse, error)
-	Update(ctx context.Context, id int64, req models.PatchSubscriptionRequest) error
+	Update(ctx context.Context, id int64, req models.PatchSubscriptionRequest) (models.Subscription, error)
 	Delete(ctx context.Context, id int64) error
 	TotalCost(ctx context.Context, userID uuid.UUID, serviceName, startDate, endDate string) (models.GetSubscriptionTotalAmountResponse, error)
 }
@@ -76,6 +76,7 @@ func (h *SubscriptionHandler) Create(c *gin.Context) {
 // @Param        page_size  query     int     false  "Размер страницы"    default(20)
 // @Success      200        {object}  models.ListSubscriptionsResponse
 // @Failure      400        {object}  models.ErrorResponse
+// @Failure      404        {object}  models.ErrorResponse
 // @Failure      500        {object}  models.ErrorResponse
 // @Router       /subscriptions [get]
 func (h *SubscriptionHandler) List(c *gin.Context) {
@@ -107,7 +108,7 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 // @Produce      json
 // @Param        id    path      int                             true  "ID подписки"
 // @Param        body  body      models.PatchSubscriptionRequest true  "Новая дата окончания"
-// @Success      204   "No Content"
+// @Success      200   {object}  models.Subscription
 // @Failure      400   {object}  models.ErrorResponse
 // @Failure      404   {object}  models.ErrorResponse
 // @Failure      500   {object}  models.ErrorResponse
@@ -127,21 +128,23 @@ func (h *SubscriptionHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.Update(c.Request.Context(), id, req); err != nil {
+	sub, err := h.svc.Update(c.Request.Context(), id, req)
+	if err != nil {
 		writeServiceError(c, h.log, err, "failed to update subscription")
 		return
 	}
 
 	h.log.Info("subscription updated", slog.Int64("id", id))
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, sub)
 }
 
 // @Summary      Удалить подписку
 // @Tags         subscriptions
 // @Produce      json
 // @Param        id  path  int  true  "ID подписки"
-// @Success      204  "No Content"
+// @Success      200  {object}  models.CreateSubscriptionResponse
 // @Failure      400  {object}  models.ErrorResponse
+// @Failure      404  {object}  models.ErrorResponse
 // @Failure      500  {object}  models.ErrorResponse
 // @Router       /subscriptions/{id} [delete]
 func (h *SubscriptionHandler) Delete(c *gin.Context) {
@@ -158,7 +161,7 @@ func (h *SubscriptionHandler) Delete(c *gin.Context) {
 	}
 
 	h.log.Info("subscription deleted", slog.Int64("id", id))
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, models.CreateSubscriptionResponse{ID: id})
 }
 
 // @Summary      Суммарная стоимость подписок

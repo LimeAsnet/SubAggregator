@@ -148,10 +148,10 @@ func TestHandler_Update_InvalidID(t *testing.T) {
 
 func TestHandler_Update_Success(t *testing.T) {
 	svc := &mocks.SubscriptionService{
-		UpdateFn: func(_ context.Context, id int64, req models.PatchSubscriptionRequest) error {
+		UpdateFn: func(_ context.Context, id int64, req models.PatchSubscriptionRequest) (models.Subscription, error) {
 			assert.Equal(t, int64(1), id)
 			assert.Equal(t, "12-2026", req.EndDate)
-			return nil
+			return models.Subscription{ID: 1, ServiceName: "Netflix", UserID: testUserID}, nil
 		},
 	}
 
@@ -160,7 +160,11 @@ func TestHandler_Update_Success(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	setupRouter(newTestHandler(svc)).ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusNoContent, w.Code)
+	require.Equal(t, http.StatusOK, w.Code)
+	var sub models.Subscription
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &sub))
+	assert.Equal(t, int64(1), sub.ID)
+	assert.Equal(t, "Netflix", sub.ServiceName)
 }
 
 func TestHandler_Delete_Success(t *testing.T) {
@@ -176,7 +180,10 @@ func TestHandler_Delete_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/subscriptions/5", nil)
 	setupRouter(newTestHandler(svc)).ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp models.CreateSubscriptionResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, int64(5), resp.ID)
 	assert.Equal(t, int64(5), deleted)
 }
 
@@ -186,6 +193,23 @@ func TestHandler_Delete_InvalidID(t *testing.T) {
 	setupRouter(newTestHandler(&mocks.SubscriptionService{})).ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandler_Delete_NotFound(t *testing.T) {
+	svc := &mocks.SubscriptionService{
+		DeleteFn: func(context.Context, int64) error {
+			return service.ErrNotFound
+		},
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/subscriptions/999", nil)
+	setupRouter(newTestHandler(svc)).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	var resp map[string]string
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, service.ErrNotFound.Error(), resp["error"])
 }
 
 func TestHandler_List_Success(t *testing.T) {
@@ -213,6 +237,23 @@ func TestHandler_List_Success(t *testing.T) {
 	assert.Equal(t, int64(1), result.Total)
 	assert.Equal(t, 1, result.Page)
 	assert.Equal(t, 20, result.PageSize)
+}
+
+func TestHandler_List_NotFound(t *testing.T) {
+	svc := &mocks.SubscriptionService{
+		ListFn: func(context.Context, uuid.UUID, service.Pagination) (models.ListSubscriptionsResponse, error) {
+			return models.ListSubscriptionsResponse{}, service.ErrNotFound
+		},
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/subscriptions?user_id="+testUserID.String(), nil)
+	setupRouter(newTestHandler(svc)).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	var resp map[string]string
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, service.ErrNotFound.Error(), resp["error"])
 }
 
 func TestHandler_List_InvalidPage(t *testing.T) {
@@ -250,8 +291,8 @@ func TestHandler_Create_ActiveSubscription(t *testing.T) {
 
 func TestHandler_Update_NotFound(t *testing.T) {
 	svc := &mocks.SubscriptionService{
-		UpdateFn: func(context.Context, int64, models.PatchSubscriptionRequest) error {
-			return service.ErrNotFound
+		UpdateFn: func(context.Context, int64, models.PatchSubscriptionRequest) (models.Subscription, error) {
+			return models.Subscription{}, service.ErrNotFound
 		},
 	}
 
@@ -268,8 +309,8 @@ func TestHandler_Update_NotFound(t *testing.T) {
 
 func TestHandler_Update_EndBeforeStart(t *testing.T) {
 	svc := &mocks.SubscriptionService{
-		UpdateFn: func(context.Context, int64, models.PatchSubscriptionRequest) error {
-			return service.ErrEndBeforeStart
+		UpdateFn: func(context.Context, int64, models.PatchSubscriptionRequest) (models.Subscription, error) {
+			return models.Subscription{}, service.ErrEndBeforeStart
 		},
 	}
 

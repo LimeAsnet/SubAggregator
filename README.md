@@ -168,10 +168,10 @@ Swagger: **http://localhost:8082/swagger/index.html**
 | Метод | Путь | Описание |
 |-------|------|----------|
 | `POST` | `/subscriptions` | Создать подписку |
-| `GET` | `/subscriptions?user_id={uuid}&page=1&page_size=20` | Список подписок пользователя (с пагинацией) |
+| `GET` | `/subscriptions?user_id={uuid}&page=1&page_size=20` | Список подписок пользователя; `404` если подписок нет |
 | `GET` | `/subscriptions/total` | Суммарная стоимость за период |
-| `PATCH` | `/subscriptions/{id}` | Обновить дату окончания (`end_date`) |
-| `DELETE` | `/subscriptions/{id}` | Удалить подписку |
+| `PATCH` | `/subscriptions/{id}` | Обновить `end_date` → `200` + обновлённая подписка |
+| `DELETE` | `/subscriptions/{id}` | Удалить подписку → `200` + `{ "id": ... }`; `404` если не найдена |
 
 ### Формат дат
 
@@ -212,6 +212,8 @@ curl "http://localhost:8082/api/v1/subscriptions?user_id=550e8400-e29b-41d4-a716
 
 Параметры `page` (по умолчанию `1`) и `page_size` (по умолчанию `20`, максимум `100`) опциональны.
 
+Если у пользователя нет подписок — ответ `404`.
+
 **Суммарная стоимость**
 
 ```bash
@@ -220,7 +222,7 @@ curl "http://localhost:8082/api/v1/subscriptions/total?user_id=550e8400-e29b-41d
 
 **Обновить дату окончания подписки**
 
-Тело запроса содержит только `end_date` (формат `MM-YYYY`):
+Тело запроса содержит только `end_date` (формат `MM-YYYY`). Ответ `200` — полная модель подписки:
 
 ```bash
 curl -X PATCH http://localhost:8082/api/v1/subscriptions/1 \
@@ -229,6 +231,8 @@ curl -X PATCH http://localhost:8082/api/v1/subscriptions/1 \
 ```
 
 **Удалить подписку**
+
+Успех — `200` с телом `{ "id": 1 }`. Если подписки с таким `id` нет — `404`:
 
 ```bash
 curl -X DELETE http://localhost:8082/api/v1/subscriptions/1
